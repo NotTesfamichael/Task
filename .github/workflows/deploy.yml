@@ -55,6 +55,8 @@ jobs:
         run: |
           # Use the image tag from the build job 
           IMAGE_TAG=${{ needs.build-and-scan.outputs.image_tag }}
+
+          kubectl apply -f k8s/config-secrets.yaml
           
           # Apply manifests first to ensure objects exist [cite: 9, 14]
           kubectl apply -f k8s/
