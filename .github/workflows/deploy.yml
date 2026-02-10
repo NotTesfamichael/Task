@@ -60,7 +60,7 @@ jobs:
           kubectl apply -f k8s/
           
           # Update the image to the new version [cite: 66, 73]
-          kubectl set image deployment/api-deployment flask-api=kiyadur/python-api:$IMAGE_TAG
+          kubectl set image deployment/flask-api flask-api=kiyadur/python-api:$IMAGE_TAG
           
           # Verify rollout [cite: 67]
           kubectl rollout status deployment/flask-api
