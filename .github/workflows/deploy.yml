@@ -43,19 +43,57 @@ jobs:
     runs-on: ubuntu-latest
     environment: development
     steps:
-      - uses: actions/checkout@v3
-      - name: Deploy to K8s Dev
+      - uses: actions/checkout@v4
+
+      - name: Set up Kubeconfig
         run: |
-          kubectl set image deployment/flask-api flask-api=kiyadur/python-api:${{ needs.build-and-scan.outputs.image_tag }}
+          mkdir -p ~/.kube
+          echo "${{ secrets.KUBE_CONFIG }}" > ~/.kube/config
+          chmod 600 ~/.kube/config
+
+      - name: Deploy to Cloud Kind
+        run: |
+          # Use the image tag from the build job 
+          IMAGE_TAG=${{ needs.build-and-scan.outputs.image_tag }}
+          
+          # Apply manifests first to ensure objects exist [cite: 9, 14]
+          kubectl apply -f k8s/
+          
+          # Update the image to the new version [cite: 66, 73]
+          kubectl set image deployment/api-deployment flask-api=kiyadur/python-api:$IMAGE_TAG
+          
+          # Verify rollout [cite: 67]
           kubectl rollout status deployment/flask-api
 
   deploy-prod:
     needs: [build-and-scan, deploy-dev]
     runs-on: ubuntu-latest
-    environment: production # Requires manual approval in GitHub Settings
+    environment: 
+      name: production
     steps:
-      - uses: actions/checkout@v3
-      - name: Deploy to K8s Prod
+      - name: Setup Kubeconfig
         run: |
-          kubectl set image deployment/flask-api flask-api=kiyadur/python-api:${{ needs.build-and-scan.outputs.image_tag }}
-          kubectl rollout status deployment/flask-api
+          mkdir -p ~/.kube
+          echo "${{ secrets.PROD_KUBE_CONFIG }}" > ~/.kube/config
+          chmod 600 ~/.kube/config
+
+      - name: Production Health Check Pre-flight
+        run: |
+          # Basic check to ensure the cluster is reachable before starting
+          kubectl cluster-info 
+
+      - name: Deploy to Prod
+        run: |
+          IMAGE_TAG=${{ needs.build-and-scan.outputs.image_tag }}
+          # Apply standard manifests
+          kubectl apply -f k8s/
+          # Specifically update the production deployment image
+          kubectl set image deployment/flask-api flask-api=kiyadur/python-api:$IMAGE_TAG
+          
+          # Block until the rollout is successful
+          kubectl rollout status deployment/flask-api --timeout=300s
+
+      - name: Post-Deployment Verification
+        run: |
+          # Query the public endpoint of the production API
+          curl -f http://${{ secrets.PROD_LB_URL }}/health || (echo "Health check failed!" && exit 1)
