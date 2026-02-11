@@ -1,0 +1,13 @@
+# Ignore Terraform's local working directory
+terraform/.terraform/
+
+# Ignore local state files (Very important for security)
+terraform/*.tfstate
+terraform/*.tfstate.backup
+
+# Ignore variable files that might contain secrets
+terraform/*.tfvars
+terraform/terraform.tfvars
+
+# Ignore crash logs
+terraform/crash.log
